@@ -1,6 +1,7 @@
 import numpy as np
 import argparse
 import cv2
+import math
 
 
 def read_image():
@@ -62,22 +63,67 @@ def find_sizes(image, cnts):
 	print(sizes)
 	print(max_val)
 	c = cnts[max_index]
-	(x, y, w, h) = cv2.boundingRect(c)
-	clock_hand = image[y:y + h, x:x + w]
-	print(x, y)
-	print(h, w)
+	(mx, my, mw, mh) = cv2.boundingRect(c)
+	clock_hand = image[my:my + mh, mx:mx + mw]
 	cv2.imshow("Clock Hand", clock_hand)
 	cv2.waitKey(0)
 
+	min_angle = find_angle(image, mx, my, mw, mh)
+	
+	print("minute is", min_angle / 360 * 60)
+
+def find_angle(image, x, y, w, h):
+	print(image.shape[1])
+	(centerX, centerY) = (image.shape[1] // 2, image.shape[0] // 2)
+	quadrant = -1
+	nearCenter = image.shape[0] // 10
+	# Checks which of the edges is near the center to determine quadrant
+	# 4 2
+	# 3 1
+	# ax, ay, bx, by
+	x_vals = [x, x + w]
+	y_vals = [y, y + h]
+	quadrant = 0 
+	found = False
+	for ax in x_vals:
+		for ay in y_vals:
+			quadrant += 1
+			if (centerX - ax)**2 + (centerY - ay)**2 < nearCenter**2:
+				found = True
+				break
+
+		if found:
+			break
+
+	bx = 2 * x + w - ax
+	by = 2 * y + h - ay
+	print(ax, ay, bx, by, quadrant)
+
+	slope = -(by - ay) / (bx - ax)
+	print(slope)
+
+	angle = np.arctan(slope)
+	angle = angle * 180 / math.pi
+	print(angle * 180 / math.pi)
+
+	top_angle = 90 - angle
+	print(top_angle)
+	if quadrant == 3 or quadrant == 4:
+		top_angle += 180
+
+	print(top_angle)
+	return top_angle
+
 def main():
 	image = read_image()
+	r = 500.0 / image.shape[0]
+	dim = (int(image.shape[1] * r), 500)
+	image = cv2.resize(image, dim, interpolation = cv2.INTER_AREA)
+
 	draw_circle(image)
 	cnts = parse_contours(image)
 	find_sizes(image, cnts)
+	
+
 
 main()
-
-# cv2.circle(mask, (int(centerX), int(centerY)), int(radius), 255, -1)
-# mask = mask[y:y + h, x:x + w]
-# cv2.imshow("Masked Thing", cv2.bitwise_and(coin, coin, mask = mask))
-# cv2.waitKey(0)
