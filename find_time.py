@@ -5,6 +5,7 @@ import math
 
 
 def read_image():
+	# Reads the image
 	ap = argparse.ArgumentParser()
 	ap.add_argument("-i", "--image", required = True,
 		help = "Path to the image")
@@ -15,27 +16,30 @@ def read_image():
 	return image
 
 def draw_circle(image):
+	# Draws a white circle in the middle
 	(centerX, centerY) = (image.shape[1] // 2, image.shape[0] // 2)
 	white = (255, 255, 255)
 	circSize = image.shape[0] // 15
 	cv2.circle(image, (centerX, centerY), circSize, white, -1)
-	cv2.imshow("With Circle", image)
-	cv2.waitKey(0)
+	# cv2.imshow("With Circle", image)
+	# cv2.waitKey(0)
 
 	return image
 
 def parse_contours(image):
+	# Uses Canny to blur the images and finds the contours
 	gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-	blurred = cv2.GaussianBlur(gray, (15, 15), 0)
+	blurred = cv2.GaussianBlur(gray, (11, 11), 0)
 
-	cv2.imshow("Image", image)
-	cv2.imshow("Blurred", blurred)
+	# cv2.imshow("Image", image)
+	# cv2.imshow("Blurred", blurred)
 
 	edged = cv2.Canny(blurred, 30, 150)
-	cv2.imshow("Edges", edged)
-	cv2.waitKey(0)
+	# cv2.imshow("Edges", edged)
+	# cv2.waitKey(0)
 
 	(cnts, _) = cv2.findContours(edged.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+	# print(cnts)
 
 	cv2.drawContours(image, cnts, -1, (0, 255, 0), 2)
 	cv2.imshow("Contours", image)
@@ -45,18 +49,48 @@ def parse_contours(image):
 
 
 def find_sizes(image, cnts):
+	(centerX, centerY) = (image.shape[1] // 2, image.shape[0] // 2)
 	sizes = []
-	for (i, c) in enumerate(cnts):
+	# Goes through the contours and adds the size of the bounding box
+	for c in cnts:
 		(x, y, w, h) = cv2.boundingRect(c)
 		sizes.append(w**2 + h**2)
 		
-	print(sizes)
+		
+	# print(sizes)
+	minDist = 100000000
+	maxDist = 0
+	print(cnts[0][0])
+	# Finds the closest and farthest points on the numbers
+	for (i, c) in enumerate(cnts):
+		if sizes[i] < 5000:
+			for j in range(len(cnts[i])):
+				(x, y) = cnts[i][j][0]
+				centerDist = (x - centerX)**2 + (y - centerY)**2
+				minDist = min(minDist, centerDist)
+				maxDist = max(maxDist, centerDist)
+
+	print("minDist:", minDist)
+
+	# Draws a circle inside and outside the numbers
+	(centerX, centerY) = (image.shape[1] // 2, image.shape[0] // 2)
+	white = (255, 255, 255)
+	circSize = int(minDist**(1/2))
+	cv2.circle(image, (centerX, centerY), circSize, white, -1)
+	cv2.imshow("Inside circle", image)
+
+	circSize2 = int(maxDist**(1/2)) + 2
+	cv2.circle(image, (centerX, centerY), circSize2, white, -1)
+	cv2.imshow("Outside circle", image)
+	cv2.waitKey(0)
+
 	min_index = -1
 	min_val = -1
 	sec_index = -1
 	sec_val = -1
 	hour_val = -1
 	hour_index = -1
+	# Finds the first, second, and third biggest hands
 	for i in range(len(sizes)):
 		if sizes[i] > min_val:
 			min_val = sizes[i]
@@ -105,21 +139,22 @@ def find_sizes(image, cnts):
 	min_pts = cnts[min_index]
 	(mx, my, mw, mh) = cv2.boundingRect(min_pts)
 	min_hand = image[my:my + mh, mx:mx + mw]
-	cv2.imshow("Minute Hand", min_hand)
-	cv2.waitKey(0)
+	# cv2.imshow("Minute Hand", min_hand)
+	# cv2.waitKey(0)
 
 	sec_pts = cnts[sec_index]
 	(sx, sy, sw, sh) = cv2.boundingRect(sec_pts)
 	sec_hand = image[sy:sy + sh, sx:sx + sw]
-	cv2.imshow("Second Hand", sec_hand)
-	cv2.waitKey(0)
+	# cv2.imshow("Second Hand", sec_hand)
+	# cv2.waitKey(0)
 
 	hour_pts = cnts[hour_index]
 	(hx, hy, hw, hh) = cv2.boundingRect(hour_pts)
 	hour_hand = image[hy:hy + hh, hx:hx + hw]
-	cv2.imshow("Hour Hand", hour_hand)
-	cv2.waitKey(0)
+	# cv2.imshow("Hour Hand", hour_hand)
+	# cv2.waitKey(0)
 
+	# Finds the angles and outputs them
 	min_angle = find_angle(image, mx, my, mw, mh)
 	sec_angle = find_angle(image, sx, sy, sw, sh)
 	hour_angle = find_angle(image, hx, hy, hw, hh)
