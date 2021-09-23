@@ -27,8 +27,9 @@ def draw_circle(image):
 	return image
 
 def parse_contours(image):
+	imageCopy = image.copy()
 	# Uses Canny to blur the images and finds the contours
-	gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+	gray = cv2.cvtColor(imageCopy, cv2.COLOR_BGR2GRAY)
 	blurred = cv2.GaussianBlur(gray, (11, 11), 0)
 
 	# cv2.imshow("Image", image)
@@ -41,12 +42,11 @@ def parse_contours(image):
 	(cnts, _) = cv2.findContours(edged.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 	# print(cnts)
 
-	cv2.drawContours(image, cnts, -1, (0, 255, 0), 2)
-	cv2.imshow("Contours", image)
+	cv2.drawContours(imageCopy, cnts, -1, (0, 255, 0), 2)
+	cv2.imshow("Contours", imageCopy)
 	cv2.waitKey(0)
 
 	return cnts
-
 
 def find_sizes(image, cnts):
 	(centerX, centerY) = (image.shape[1] // 2, image.shape[0] // 2)
@@ -60,7 +60,6 @@ def find_sizes(image, cnts):
 	# print(sizes)
 	minDist = 100000000
 	maxDist = 0
-	print(cnts[0][0])
 	# Finds the closest and farthest points on the numbers
 	for (i, c) in enumerate(cnts):
 		if sizes[i] < 5000:
@@ -72,17 +71,25 @@ def find_sizes(image, cnts):
 
 	print("minDist:", minDist)
 
-	# Draws a circle inside and outside the numbers
 	(centerX, centerY) = (image.shape[1] // 2, image.shape[0] // 2)
 	white = (255, 255, 255)
-	circSize = int(minDist**(1/2))
-	cv2.circle(image, (centerX, centerY), circSize, white, -1)
-	cv2.imshow("Inside circle", image)
 
-	circSize2 = int(maxDist**(1/2)) + 2
-	cv2.circle(image, (centerX, centerY), circSize2, white, -1)
-	cv2.imshow("Outside circle", image)
+	insideCircSize = int(minDist**(1/2))
+	mask = np.zeros(image.shape[:2], dtype = "uint8")
+	cv2.circle(mask, (centerX, centerY), insideCircSize, 255, -1)
+	insideOnly = cv2.bitwise_and(image, image, mask = mask)
+	cv2.imshow("Inside Only", insideOnly)
+
+	outsideCircSize = int(maxDist**(1/2)) + 2
+	outsideOnly = image.copy()
+	cv2.circle(outsideOnly, (centerX, centerY), outsideCircSize, white, -1)
+	cv2.imshow("Outside circle", outsideOnly)
+
+	cv2.imshow("Original", image)
+
 	cv2.waitKey(0)
+	
+	find_outside_angles(outsideOnly)
 
 	min_index = -1
 	min_val = -1
@@ -162,6 +169,54 @@ def find_sizes(image, cnts):
 	print("minute is", min_angle / 360 * 60)
 	print("second is", sec_angle / 360 * 60)
 	print("hour is", hour_angle / 360 * 12)
+
+def find_outside_angles(outsideOnly):
+	cnts = parse_contours(outsideOnly)
+
+	# Minute then second
+	coords = []
+	for c in cnts:
+		# Finds the average rgb to determine second vs. minute
+		(x, y, w, h) = cv2.boundingRect(c)
+		r_avg = 0
+		b_avg = 0
+		g_avg = 0
+		for x_val in range(x, x + w):
+			for y_val in range(y, y + h):
+				(b, g, r) = outsideOnly[y_val, x_val]
+				r_avg += r
+				b_avg += b
+				g_avg += g 
+		
+		r_avg /= (w * h)
+		b_avg /= (w * h)
+		g_avg /= (w * h)
+
+		coords.append([x + w / 2, y + h / 2, r_avg, b_avg, g_avg])
+
+	# Makes it minute then second by swapping
+	if coords[0][2] > coords[1][2]:
+		temp = coords[0]
+		coords[0] = coords[1]
+		coords[1] = temp
+
+	(centerX, centerY) = (outsideOnly.shape[1] // 2, outsideOnly.shape[0] // 2)
+	# Look through the two hands and find the angle
+	for i in range(2):
+		# Calculate x, y, w, h to use find_angle
+		(handX, handY) = (coords[i][0], coords[i][1])
+		handBoxX = min(handX, centerX)
+		handBoxY = min(handY, centerY)
+		handBoxW = max(handX, centerX) - handBoxX
+		handBoxH = max(handY, centerY) - handBoxY
+		handAngle = find_angle(outsideOnly, handBoxX, handBoxY, handBoxW, handBoxH)
+		if i == 0:
+			print("minute is", handAngle / 360 * 60)
+		else:
+			print("second is", handAngle / 360 * 60)
+
+	cv2.imshow("Outside Only", outsideOnly)
+	cv2.waitKey(0)
 
 def find_angle(image, x, y, w, h):
 	(centerX, centerY) = (image.shape[1] // 2, image.shape[0] // 2)
