@@ -69,16 +69,25 @@ def find_sizes(image, cnts):
 				minDist = min(minDist, centerDist)
 				maxDist = max(maxDist, centerDist)
 
-	print("minDist:", minDist)
-
 	(centerX, centerY) = (image.shape[1] // 2, image.shape[0] // 2)
 	white = (255, 255, 255)
 
+	# Uses a mask to get the inside part
 	insideCircSize = int(minDist**(1/2))
 	mask = np.zeros(image.shape[:2], dtype = "uint8")
 	cv2.circle(mask, (centerX, centerY), insideCircSize, 255, -1)
 	insideOnly = cv2.bitwise_and(image, image, mask = mask)
+
+	# Makes everything outside of the inside white (maybe optimize with masks later)
+	for x in range(image.shape[1]):
+		for y in range(image.shape[0]):
+			if (x - centerX)**2 + (y - centerY)**2 > insideCircSize**2:
+				insideOnly[y, x] = (255, 255, 255)
+
 	cv2.imshow("Inside Only", insideOnly)
+
+
+	parse_contours(insideOnly)
 
 	outsideCircSize = int(maxDist**(1/2)) + 2
 	outsideOnly = image.copy()
