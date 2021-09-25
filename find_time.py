@@ -19,7 +19,7 @@ def draw_circle(image):
 	# Draws a white circle in the middle
 	(centerX, centerY) = (image.shape[1] // 2, image.shape[0] // 2)
 	white = (255, 255, 255)
-	circSize = image.shape[0] // 15
+	circSize = image.shape[0] // 10
 	cv2.circle(image, (centerX, centerY), circSize, white, -1)
 	# cv2.imshow("With Circle", image)
 	# cv2.waitKey(0)
@@ -30,7 +30,7 @@ def parse_contours(image):
 	imageCopy = image.copy()
 	# Uses Canny to blur the images and finds the contours
 	gray = cv2.cvtColor(imageCopy, cv2.COLOR_BGR2GRAY)
-	blurred = cv2.GaussianBlur(gray, (11, 11), 0)
+	blurred = cv2.GaussianBlur(gray, (3, 3), 0)
 
 	# cv2.imshow("Image", image)
 	# cv2.imshow("Blurred", blurred)
@@ -45,6 +45,12 @@ def parse_contours(image):
 	cv2.drawContours(imageCopy, cnts, -1, (0, 255, 0), 2)
 	cv2.imshow("Contours", imageCopy)
 	cv2.waitKey(0)
+
+	# for c in cnts:
+	# 	(x, y, w, h) = cv2.boundingRect(c)
+	# 	coin = image[y:y + h, x:x + h]
+	# 	cv2.imshow("Coin", coin)
+	# 	cv2.waitKey(0)
 
 	return cnts
 
@@ -61,13 +67,22 @@ def find_sizes(image, cnts):
 	minDist = 100000000
 	maxDist = 0
 	# Finds the closest and farthest points on the numbers
+	# min_distances = []
+	# max_distances = []
 	for (i, c) in enumerate(cnts):
 		if sizes[i] < 5000:
+			# minDist = 100000000
+			# maxDist = 0
 			for j in range(len(cnts[i])):
 				(x, y) = cnts[i][j][0]
 				centerDist = (x - centerX)**2 + (y - centerY)**2
 				minDist = min(minDist, centerDist)
 				maxDist = max(maxDist, centerDist)
+			# min_distances.append(minDist)
+			# max_distances.append(maxDist)
+	# print(max_distances)	
+	print(maxDist)
+	print(minDist)
 
 	(centerX, centerY) = (image.shape[1] // 2, image.shape[0] // 2)
 	white = (255, 255, 255)
@@ -86,8 +101,7 @@ def find_sizes(image, cnts):
 
 	cv2.imshow("Inside Only", insideOnly)
 
-
-	parse_contours(insideOnly)
+	insideAngles = find_inside_angles(insideOnly)
 
 	outsideCircSize = int(maxDist**(1/2)) + 2
 	outsideOnly = image.copy()
@@ -98,95 +112,61 @@ def find_sizes(image, cnts):
 
 	cv2.waitKey(0)
 	
-	find_outside_angles(outsideOnly)
+	outsideAngles = find_outside_angles(outsideOnly)
 
-	min_index = -1
-	min_val = -1
-	sec_index = -1
-	sec_val = -1
-	hour_val = -1
-	hour_index = -1
-	# Finds the first, second, and third biggest hands
-	for i in range(len(sizes)):
-		if sizes[i] > min_val:
-			min_val = sizes[i]
-			min_index = i
+	print(outsideAngles)
+	print(insideAngles)
+	for (i, outsideAngle) in enumerate(outsideAngles):
+		for j in range(len(insideAngles)):
+			if abs(insideAngles[j] - outsideAngle) < 10:
+				if i == 0:
+					minAngle = insideAngles[j]
+				else:
+					secAngle = insideAngles[j]
+				break
 	
-	min_found = False
-	for i in range(len(sizes)):
-		if min_val == sizes[i] and not(min_found):
-			min_found = True
-			continue
-		if sizes[i] > sec_val:
-			sec_val = sizes[i]
-			sec_index = i
+	hourAngle = 0
+	for insideAngle in insideAngles:
+		hourAngle += insideAngle
+	if len(insideAngles) == 2:
+		hourAngle *= 3 / 2
+	elif len(insideAngles) == 1:
+		hourAngle *= 3
+	hourAngle -= minAngle + secAngle
 
-	min_found = False
-	sec_found = False
-	for i in range(len(sizes)):
-		if min_val == sizes[i] and not(min_found):
-			min_found = True
-			continue
-		if sec_val == sizes[i] and not(sec_found):
-			sec_found = True
-			continue
-		if sizes[i] > hour_val:
-			hour_val = sizes[i]
-			hour_index = i
+	print(hourAngle, minAngle, secAngle)
 
+	hourTime = math.floor(hourAngle / 360 * 12)
+	minTime = round(minAngle / 360 * 60)
+	secTime = round(secAngle / 360 * 60)
 	
-	# for i in range(len(sizes)):
-	# 	if sizes[i] > min_val:
-	# 		hour_val = sec_val
-	# 		hour_index = sec_index 
-	# 		sec_val = min_val 
-	# 		sec_index = min_index	
-	# 		min_val = sizes[i]
-	# 		min_index = i
-	# 	elif sizes[i] > sec_val:
-	# 		hour_val = sec_val
-	# 		hour_index = sec_index 
-	# 		sec_val = sizes[i]
-	# 		sec_index = i
-	# 	elif sizes[i] > hour_val:
-	# 		hour_val = sizes[i]
-	# 		hour_index = i
-			
-	min_pts = cnts[min_index]
-	(mx, my, mw, mh) = cv2.boundingRect(min_pts)
-	min_hand = image[my:my + mh, mx:mx + mw]
-	# cv2.imshow("Minute Hand", min_hand)
-	# cv2.waitKey(0)
+	print("%d:%d:%d" % (hourTime, minTime, secTime))
 
-	sec_pts = cnts[sec_index]
-	(sx, sy, sw, sh) = cv2.boundingRect(sec_pts)
-	sec_hand = image[sy:sy + sh, sx:sx + sw]
-	# cv2.imshow("Second Hand", sec_hand)
-	# cv2.waitKey(0)
 
-	hour_pts = cnts[hour_index]
-	(hx, hy, hw, hh) = cv2.boundingRect(hour_pts)
-	hour_hand = image[hy:hy + hh, hx:hx + hw]
-	# cv2.imshow("Hour Hand", hour_hand)
-	# cv2.waitKey(0)
+def find_inside_angles(insideOnly):
+	# Adds each of the hands and uses find_angle to calculate the angles
+	cnts = parse_contours(insideOnly)
 
-	# Finds the angles and outputs them
-	min_angle = find_angle(image, mx, my, mw, mh)
-	sec_angle = find_angle(image, sx, sy, sw, sh)
-	hour_angle = find_angle(image, hx, hy, hw, hh)
+	coords = []
+	for hand in cnts:
+		(x, y, w, h) = cv2.boundingRect(hand)
+		coords.append([x, y, w, h])
 	
-	print("minute is", min_angle / 360 * 60)
-	print("second is", sec_angle / 360 * 60)
-	print("hour is", hour_angle / 360 * 12)
+	angles = []
+	for i in range(len(coords)):
+		handAngle = find_angle(insideOnly, coords[i][0], coords[i][1], coords[i][2], coords[i][3])
+		angles.append(handAngle)
+
+	return angles
 
 def find_outside_angles(outsideOnly):
 	cnts = parse_contours(outsideOnly)
 
 	# Minute then second
 	coords = []
-	for c in cnts:
+	for hand in cnts:
 		# Finds the average rgb to determine second vs. minute
-		(x, y, w, h) = cv2.boundingRect(c)
+		(x, y, w, h) = cv2.boundingRect(hand)
 		r_avg = 0
 		b_avg = 0
 		g_avg = 0
@@ -211,6 +191,7 @@ def find_outside_angles(outsideOnly):
 
 	(centerX, centerY) = (outsideOnly.shape[1] // 2, outsideOnly.shape[0] // 2)
 	# Look through the two hands and find the angle
+	angles = []
 	for i in range(2):
 		# Calculate x, y, w, h to use find_angle
 		(handX, handY) = (coords[i][0], coords[i][1])
@@ -219,13 +200,11 @@ def find_outside_angles(outsideOnly):
 		handBoxW = max(handX, centerX) - handBoxX
 		handBoxH = max(handY, centerY) - handBoxY
 		handAngle = find_angle(outsideOnly, handBoxX, handBoxY, handBoxW, handBoxH)
-		if i == 0:
-			print("minute is", handAngle / 360 * 60)
-		else:
-			print("second is", handAngle / 360 * 60)
+		angles.append(handAngle)
 
-	cv2.imshow("Outside Only", outsideOnly)
-	cv2.waitKey(0)
+	return angles
+	# cv2.imshow("Outside Only", outsideOnly)
+	# cv2.waitKey(0)
 
 def find_angle(image, x, y, w, h):
 	(centerX, centerY) = (image.shape[1] // 2, image.shape[0] // 2)
@@ -257,25 +236,18 @@ def find_angle(image, x, y, w, h):
 
 	ax = optimalAx
 	ay = optimalAy
-	print(quadrant)
 	bx = 2 * x + w - ax
 	by = 2 * y + h - ay
-	print(x, y, w, h)
-	print(ax, ay, bx, by, quadrant)
 
 	slope = -(by - ay) / (bx - ax)
-	print("slope:", slope)
 
 	angle = np.arctan(slope)
 	angle = angle * 180 / math.pi
-	print("angle:", angle)
 
 	top_angle = 90 - angle
 	if quadrant == 3 or quadrant == 4:
 		top_angle += 180
 
-	print("top_angle:", top_angle)
-	print("\n\n")
 	return top_angle
 
 def main():
