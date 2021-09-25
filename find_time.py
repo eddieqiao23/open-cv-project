@@ -3,14 +3,12 @@ import argparse
 import cv2
 import math
 
-
 def read_image():
 	# Reads the image
 	ap = argparse.ArgumentParser()
 	ap.add_argument("-i", "--image", required = True,
 		help = "Path to the image")
 	args = vars(ap.parse_args())
-
 	image = cv2.imread(args["image"])
 
 	return image
@@ -21,36 +19,19 @@ def draw_circle(image):
 	white = (255, 255, 255)
 	circSize = image.shape[0] // 10
 	cv2.circle(image, (centerX, centerY), circSize, white, -1)
-	# cv2.imshow("With Circle", image)
-	# cv2.waitKey(0)
 
 	return image
 
-def parse_contours(image):
+def find_contours(image):
 	imageCopy = image.copy()
-	# Uses Canny to blur the images and finds the contours
+	# Blurs and finds edges on the image
 	gray = cv2.cvtColor(imageCopy, cv2.COLOR_BGR2GRAY)
 	blurred = cv2.GaussianBlur(gray, (3, 3), 0)
-
-	# cv2.imshow("Image", image)
-	# cv2.imshow("Blurred", blurred)
-
 	edged = cv2.Canny(blurred, 30, 150)
-	# cv2.imshow("Edges", edged)
-	# cv2.waitKey(0)
 
+	# Finds the contours on the image
 	(cnts, _) = cv2.findContours(edged.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-	# print(cnts)
-
 	cv2.drawContours(imageCopy, cnts, -1, (0, 255, 0), 2)
-	cv2.imshow("Contours", imageCopy)
-	cv2.waitKey(0)
-
-	# for c in cnts:
-	# 	(x, y, w, h) = cv2.boundingRect(c)
-	# 	coin = image[y:y + h, x:x + h]
-	# 	cv2.imshow("Coin", coin)
-	# 	cv2.waitKey(0)
 
 	return cnts
 
@@ -63,90 +44,50 @@ def find_sizes(image, cnts):
 		sizes.append(w**2 + h**2)
 		
 		
-	# print(sizes)
 	minDist = 100000000
 	maxDist = 0
 	# Finds the closest and farthest points on the numbers
-	# min_distances = []
-	# max_distances = []
 	for (i, c) in enumerate(cnts):
 		if sizes[i] < 5000:
-			# minDist = 100000000
-			# maxDist = 0
 			for j in range(len(cnts[i])):
 				(x, y) = cnts[i][j][0]
 				centerDist = (x - centerX)**2 + (y - centerY)**2
 				minDist = min(minDist, centerDist)
 				maxDist = max(maxDist, centerDist)
-			# min_distances.append(minDist)
-			# max_distances.append(maxDist)
-	# print(max_distances)	
-	print(maxDist)
-	print(minDist)
 
 	(centerX, centerY) = (image.shape[1] // 2, image.shape[0] // 2)
 	white = (255, 255, 255)
 
 	# Uses a mask to get the inside part
-	insideCircSize = int(minDist**(1/2))
+	insideCircSize = int(minDist**(1/2)) - 10
 	mask = np.zeros(image.shape[:2], dtype = "uint8")
 	cv2.circle(mask, (centerX, centerY), insideCircSize, 255, -1)
 	insideOnly = cv2.bitwise_and(image, image, mask = mask)
 
-	# Makes everything outside of the inside white (maybe optimize with masks later)
+	# Makes everything outside of the inside white 
 	for x in range(image.shape[1]):
 		for y in range(image.shape[0]):
 			if (x - centerX)**2 + (y - centerY)**2 > insideCircSize**2:
 				insideOnly[y, x] = (255, 255, 255)
 
-	cv2.imshow("Inside Only", insideOnly)
-
+	# Uses the function to find the three inside angles
 	insideAngles = find_inside_angles(insideOnly)
 
 	outsideCircSize = int(maxDist**(1/2)) + 2
 	outsideOnly = image.copy()
+	# Draws a circle to get rid of the numbers and everything inside them
 	cv2.circle(outsideOnly, (centerX, centerY), outsideCircSize, white, -1)
-	cv2.imshow("Outside circle", outsideOnly)
-
-	cv2.imshow("Original", image)
-
-	cv2.waitKey(0)
 	
+	# Uses the function to find the two outside angles
 	outsideAngles = find_outside_angles(outsideOnly)
 
-	print(outsideAngles)
-	print(insideAngles)
-	for (i, outsideAngle) in enumerate(outsideAngles):
-		for j in range(len(insideAngles)):
-			if abs(insideAngles[j] - outsideAngle) < 10:
-				if i == 0:
-					minAngle = insideAngles[j]
-				else:
-					secAngle = insideAngles[j]
-				break
-	
-	hourAngle = 0
-	for insideAngle in insideAngles:
-		hourAngle += insideAngle
-	if len(insideAngles) == 2:
-		hourAngle *= 3 / 2
-	elif len(insideAngles) == 1:
-		hourAngle *= 3
-	hourAngle -= minAngle + secAngle
-
-	print(hourAngle, minAngle, secAngle)
-
-	hourTime = math.floor(hourAngle / 360 * 12)
-	minTime = round(minAngle / 360 * 60)
-	secTime = round(secAngle / 360 * 60)
-	
-	print("%d:%d:%d" % (hourTime, minTime, secTime))
-
+	display_answer(insideAngles, outsideAngles)
 
 def find_inside_angles(insideOnly):
 	# Adds each of the hands and uses find_angle to calculate the angles
-	cnts = parse_contours(insideOnly)
+	cnts = find_contours(insideOnly)
 
+	# For each of the inside angles, we find the bounding rectangle 
 	coords = []
 	for hand in cnts:
 		(x, y, w, h) = cv2.boundingRect(hand)
@@ -160,7 +101,7 @@ def find_inside_angles(insideOnly):
 	return angles
 
 def find_outside_angles(outsideOnly):
-	cnts = parse_contours(outsideOnly)
+	cnts = find_contours(outsideOnly)
 
 	# Minute then second
 	coords = []
@@ -203,8 +144,6 @@ def find_outside_angles(outsideOnly):
 		angles.append(handAngle)
 
 	return angles
-	# cv2.imshow("Outside Only", outsideOnly)
-	# cv2.waitKey(0)
 
 def find_angle(image, x, y, w, h):
 	(centerX, centerY) = (image.shape[1] // 2, image.shape[0] // 2)
@@ -250,14 +189,45 @@ def find_angle(image, x, y, w, h):
 
 	return top_angle
 
+def display_answer(insideAngles, outsideAngles):
+	# Given the three inside angles and two outside angles, finishes the calculation
+	# Matches the outside angles with an inside angle
+	for (i, outsideAngle) in enumerate(outsideAngles):
+		for j in range(len(insideAngles)):
+			if abs(insideAngles[j] - outsideAngle) < 10:
+				if i == 0:
+					minAngle = insideAngles[j]
+				else:
+					secAngle = insideAngles[j]
+				break
+	
+	# The hour angle is the one missing, so it's approximately just the sum of insideAngles - outsideAngles
+	hourAngle = 0
+	for insideAngle in insideAngles:
+		hourAngle += insideAngle
+	# Deals with if the hands are on top of each other
+	if len(insideAngles) == 2:
+		hourAngle *= 3 / 2
+	elif len(insideAngles) == 1:
+		hourAngle *= 3
+	hourAngle -= minAngle + secAngle
+
+	# Calculates the time using each angle
+	hourTime = math.floor(hourAngle / 360 * 12)
+	minTime = math.floor(minAngle / 360 * 60)
+	secTime = round(secAngle / 360 * 60)
+	
+	print("The time is %d:%02d:%02d" % (hourTime, minTime, secTime))
+
 def main():
 	image = read_image()
+	# Resizes the image so it's always the same
 	r = 500.0 / image.shape[0]
 	dim = (int(image.shape[1] * r), 500)
 	image = cv2.resize(image, dim, interpolation = cv2.INTER_AREA)
 
 	draw_circle(image)
-	cnts = parse_contours(image)
+	cnts = find_contours(image)
 	find_sizes(image, cnts)
 
 main()
