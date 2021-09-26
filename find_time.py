@@ -147,21 +147,20 @@ def find_outside_angles(outsideOnly):
 
 def find_angle(image, x, y, w, h):
 	(centerX, centerY) = (image.shape[1] // 2, image.shape[0] // 2)
-	quadrant = -1
-	nearCenter = image.shape[0] // 10
 	# Checks which of the edges is near the center to determine quadrant
 	# 4 2
 	# 3 1
 	# ax, ay, bx, by
 	x_vals = [x, x + w]
 	y_vals = [y, y + h]
+
 	quadrant = 0 
-	found = False
 	closestVal = 100000000
 	optimalAx = -1
 	optimalAy = -1
 	ax_index = 0
 	ay_index = 0
+    # Each [ax, ay] combination corresponds to a quadrant
 	for ax in x_vals:
 		ax_index += 1
 		ay_index = 0
@@ -178,12 +177,16 @@ def find_angle(image, x, y, w, h):
 	bx = 2 * x + w - ax
 	by = 2 * y + h - ay
 
+    # Calculates the slope of the line
 	slope = -(by - ay) / (bx - ax)
 
+    # Finds the angle and converts to degrees
 	angle = np.arctan(slope)
 	angle = angle * 180 / math.pi
 
+    # Finds the angle with respect to the hand pointing straight up since this is how time is calculated 
 	top_angle = 90 - angle
+    # Needs to adjust for 3, 4 since arctan range is -90 to 90
 	if quadrant == 3 or quadrant == 4:
 		top_angle += 180
 
