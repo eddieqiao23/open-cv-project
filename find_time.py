@@ -193,6 +193,9 @@ def find_angle(image, x, y, w, h):
 	return top_angle
 
 def display_answer(insideAngles, outsideAngles):
+	# If it messes up then there's a message
+	if len(insideAngles) != 3 or len(outsideAngles) != 2:
+		print("The program is confused because two hands are close :( Here is a guess:")
 	# Given the three inside angles and two outside angles, finishes the calculation
 	# Matches the outside angles with an inside angle
 	for (i, outsideAngle) in enumerate(outsideAngles):
@@ -208,11 +211,8 @@ def display_answer(insideAngles, outsideAngles):
 	hourAngle = 0
 	for insideAngle in insideAngles:
 		hourAngle += insideAngle
-	# Deals with if the hands are on top of each other
-	if len(insideAngles) == 2:
-		hourAngle *= 3 / 2
-	elif len(insideAngles) == 1:
-		hourAngle *= 3
+	# Deals with if the hands are on top of each other so it isn't super off
+	hourAngle *= 3 / len(insideAngles)
 	hourAngle -= minAngle + secAngle
 
 	# Calculates the time using each angle

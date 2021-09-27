@@ -10,3 +10,5 @@ Chapters used:
 * Chapter 8 - Used cv2.GaussianBlur to make it easier to process the image (line 29)
 * Chapter 10 - Used Canny Edge Detector with cv2.Canny() (line 30)
 * Chapter 11 - Found contours with cv2.findContours() to find the hands and the numbers (line 33)
+
+Note: clock10.png is an example of the program messing up. It doesn't happpen often, but with clock10, the hour and second hands are on top of each other, which messes it up. 
